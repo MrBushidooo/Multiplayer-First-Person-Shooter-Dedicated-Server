@@ -1,0 +1,30 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "{1C042ABD-4FA9-DF75-77C1-C18570DFD6C1}",
+	"Category": "",
+	"Description": "",
+	"Modules": [
+		{
+			"Name": "Gulag",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"Engine",
+				"UMG"
+			]
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "ModelingToolsEditorMode",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
+		},
+		{
+			"Name": "GameLiftPlugin",
+			"Enabled": true
+		}
+	]
+}

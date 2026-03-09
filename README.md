@@ -9,7 +9,7 @@ A server-authoritative multiplayer FPS prototype built in Unreal Engine 5.
 - Dedicated server deployment
 - AWS GameLift hosting
 
-## Technologies
+# Technologies
 - Unreal Engine 5
 - C++
 - AWS GameLift

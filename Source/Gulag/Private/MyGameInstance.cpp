@@ -37,189 +37,9 @@ void UMyGameInstance::Init()
 	}
 }
 
-void UMyGameInstance::PlayGame()
-{
-
-	if (bConnectionInProgress)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Connection already in progress"));
-		return;
-	}
-
-	FString Url = TEXT("https://3jmztmby8g.execute-api.us-east-1.amazonaws.com/prod-1/quick-play");
-
-	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request =
-		FHttpModule::Get().CreateRequest();
-
-	Request->SetURL(Url);
-	Request->SetVerb(TEXT("POST"));
-	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-	Request->SetContentAsString(TEXT("{}")); 
-
-	Request->OnProcessRequestComplete().BindLambda(
-		[this](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSuccess)
-		{
-			if (!bSuccess || !Resp.IsValid())
-			{
-				UE_LOG(LogTemp, Error, TEXT("QuickPlay request failed"));
-				return;
-			}
-
-			TSharedPtr<FJsonObject> Json;
-			TSharedRef<TJsonReader<>> Reader =
-				TJsonReaderFactory<>::Create(Resp->GetContentAsString());
-
-			if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
-			{
-				UE_LOG(LogTemp, Error, TEXT("Invalid QuickPlay JSON"));
-				return;
-			}
-
-			FString Ip = Json->GetStringField(TEXT("ip"));
-			int32 Port = Json->GetIntegerField(TEXT("port"));
-			const FString PlayerSessionId =
-				Json->GetStringField(TEXT("playerSessionId"));
-
-			const FString TravelURL =
-				FString::Printf(
-					TEXT("%s:%d?PlayerSessionId=%s"),
-					*Ip,
-					Port,
-					*PlayerSessionId
-				);
-
-			UE_LOG(LogTemp, Log, TEXT("QuickPlay joining %s"), *TravelURL);
-
-			ConnectToServer(TravelURL);
-		}
-	);
-
-	Request->ProcessRequest();
-}
-
+//Create a match session and generate the match code
 void UMyGameInstance::CreateGameSession()
 {
-	//test-1 ---> working
-
-	/*GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("GameInstance: CreateGameSession"));
-
-	FString url = TEXT("https://3jmztmby8g.execute-api.us-east-1.amazonaws.com/prod/ping");
-
-	TSharedRef<IHttpRequest> Request = FHttpModule::Get().CreateRequest();
-
-	Request->SetURL(url);
-	Request->SetVerb("GET");
-
-	Request->OnProcessRequestComplete().BindLambda(
-		[](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSuccess) {
-
-			if (!bSuccess || !Res.IsValid()) {
-				UE_LOG(LogTemp, Error, TEXT("HTTP request failed"));
-				return;
-			}
-
-			UE_LOG(LogTemp, Log, TEXT("Http response recieved: %s"), *Res->GetContentAsString());
-		}
-	);
-
-	Request->ProcessRequest();*/
-
-	//test - 2 ---> working
-	/*GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("Creating Game Session"));
-
-	const FString CreateSessionURL =
-		TEXT("https://3jmztmby8g.execute-api.us-east-1.amazonaws.com/prod-1/create-session");
-
-	TSharedRef<IHttpRequest> CreateReq = FHttpModule::Get().CreateRequest();
-	CreateReq->SetURL(CreateSessionURL);
-	CreateReq->SetVerb("POST");
-
-	CreateReq->OnProcessRequestComplete().BindLambda(
-		[this](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSuccess)
-		{
-			if (!bSuccess || !Res.IsValid())
-			{
-				UE_LOG(LogTemp, Error, TEXT("CreateSession HTTP failed"));
-				return;
-			}
-
-			// Parse GameSessionId
-			TSharedPtr<FJsonObject> Json;
-			TSharedRef<TJsonReader<>> Reader =
-				TJsonReaderFactory<>::Create(Res->GetContentAsString());
-
-			if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
-			{
-				UE_LOG(LogTemp, Error, TEXT("Invalid JSON from create-session"));
-				return;
-			}
-
-			const FString GameSessionId = Json->GetStringField("gameSessionId");
-
-			UE_LOG(LogTemp, Log, TEXT("GameSessionId: %s"), *GameSessionId);
-
-			
-			// JOIN SESSION
-		
-			const FString JoinURL =
-				TEXT("https://3jmztmby8g.execute-api.us-east-1.amazonaws.com/prod-1/join-session");
-
-			TSharedRef<IHttpRequest> JoinReq = FHttpModule::Get().CreateRequest();
-			JoinReq->SetURL(JoinURL);
-			JoinReq->SetVerb("POST");
-			JoinReq->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-
-			TSharedPtr<FJsonObject> Body = MakeShared<FJsonObject>();
-			Body->SetStringField("gameSessionId", GameSessionId);
-
-			FString BodyStr;
-			TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&BodyStr);
-			FJsonSerializer::Serialize(Body.ToSharedRef(), Writer);
-
-			JoinReq->SetContentAsString(BodyStr);
-
-			JoinReq->OnProcessRequestComplete().BindLambda(
-				[this](FHttpRequestPtr Req2, FHttpResponsePtr Res2, bool bSuccess2)
-				{
-					if (!bSuccess2 || !Res2.IsValid())
-					{
-						UE_LOG(LogTemp, Error, TEXT("JoinSession HTTP failed"));
-						return;
-					}
-
-					TSharedPtr<FJsonObject> JoinJson;
-					TSharedRef<TJsonReader<>> Reader2 =
-						TJsonReaderFactory<>::Create(Res2->GetContentAsString());
-
-					if (!FJsonSerializer::Deserialize(Reader2, JoinJson) || !JoinJson.IsValid())
-					{
-						UE_LOG(LogTemp, Error, TEXT("Invalid JSON from join-session"));
-						return;
-					}
-
-					const FString Ip = JoinJson->GetStringField("ip");
-					const int32 Port = JoinJson->GetIntegerField("port");
-					const FString PlayerSessionId =
-						JoinJson->GetStringField("playerSessionId");
-
-					UE_LOG(LogTemp, Log, TEXT("Connecting to %s:%d"), *Ip, Port);
-
-					if (APlayerController* PC = GetFirstLocalPlayerController())
-					{
-						const FString TravelURL =
-							FString::Printf(TEXT("%s:%d?PlayerSessionId=%s"),
-								*Ip, Port, *PlayerSessionId);
-
-						PC->ClientTravel(TravelURL, TRAVEL_Absolute);
-					}
-				}
-			);
-
-			JoinReq->ProcessRequest();
-		}
-	);
-
-	CreateReq->ProcessRequest();*/
 
 if (bConnectionInProgress)
 {
@@ -332,6 +152,7 @@ CreateReq->ProcessRequest();
 
 }
 
+//Join an existing match session with a code 
 void UMyGameInstance::JoinGameSession(const FString& SessionCode)
 {
 	if (bConnectionInProgress)
@@ -394,6 +215,7 @@ void UMyGameInstance::JoinGameSession(const FString& SessionCode)
 	Request->ProcessRequest();
 }
 
+//take a url and client travel or timeoput if takes too long
 void UMyGameInstance::ConnectToServer(const FString& ServerURL)
 {
 	if (bConnectionInProgress)
@@ -486,4 +308,64 @@ void UMyGameInstance::OnSuccessfulConnection()
 	bConnectionInProgress = false;
 
 	UE_LOG(LogTemp, Log, TEXT("Connection successful"));
+}
+
+void UMyGameInstance::PlayGame()
+{
+
+	if (bConnectionInProgress)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Connection already in progress"));
+		return;
+	}
+
+	FString Url = TEXT("https://3jmztmby8g.execute-api.us-east-1.amazonaws.com/prod-1/quick-play");
+
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request =
+		FHttpModule::Get().CreateRequest();
+
+	Request->SetURL(Url);
+	Request->SetVerb(TEXT("POST"));
+	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
+	Request->SetContentAsString(TEXT("{}")); 
+
+	Request->OnProcessRequestComplete().BindLambda(
+		[this](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSuccess)
+		{
+			if (!bSuccess || !Resp.IsValid())
+			{
+				UE_LOG(LogTemp, Error, TEXT("QuickPlay request failed"));
+				return;
+			}
+
+			TSharedPtr<FJsonObject> Json;
+			TSharedRef<TJsonReader<>> Reader =
+				TJsonReaderFactory<>::Create(Resp->GetContentAsString());
+
+			if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+			{
+				UE_LOG(LogTemp, Error, TEXT("Invalid QuickPlay JSON"));
+				return;
+			}
+
+			FString Ip = Json->GetStringField(TEXT("ip"));
+			int32 Port = Json->GetIntegerField(TEXT("port"));
+			const FString PlayerSessionId =
+				Json->GetStringField(TEXT("playerSessionId"));
+
+			const FString TravelURL =
+				FString::Printf(
+					TEXT("%s:%d?PlayerSessionId=%s"),
+					*Ip,
+					Port,
+					*PlayerSessionId
+				);
+
+			UE_LOG(LogTemp, Log, TEXT("QuickPlay joining %s"), *TravelURL);
+
+			ConnectToServer(TravelURL);
+		}
+	);
+
+	Request->ProcessRequest();
 }
